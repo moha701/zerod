@@ -1,0 +1,33 @@
+name: Update data
+
+# Runs on GitHub's servers twice a day (11:41 and 23:41 Oman time), with no Claude involved.
+on:
+  schedule:
+    - cron: "41 7,19 * * *"
+  workflow_dispatch:
+    inputs:
+      probe:
+        description: "Only print what the source pages look like (no changes)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe sources
+        if: ${{ inputs.probe }}
+        run: python tools/probe_sources.py
