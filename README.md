@@ -26,3 +26,27 @@ Camo progress and saved classes are stored in your browser on GitHub Pages.
 ## Creator
 
 ZEROED is made by **@mhmd8p2**. Follow on Instagram: https://instagram.com/mhmd8p2
+
+## The data robot (no Claude needed)
+
+`.github/workflows/update-data.yml` runs on GitHub's servers every 3 hours. Each run it:
+
+1. Runs its own tests (`tools/tests`). If any test fails, it stops.
+2. Reads the official MW4 patch notes (callofduty.com), the WZStats MW4 weapon list, CODMunity's Warzone TTK table, itemshop.gg and the Apex list on warzoneloadout.games (`tools/robot.py`).
+3. Adds new patch entries with a plain-English summary, updates gun damage, ranges and head multipliers, adds new guns and Apex attachments, updates Warzone kill times and refreshes the store.
+4. Checks every value against safe limits (`tools/validate_data.py`).
+5. Opens the site with the new data in headless Chrome and makes sure the rankings and coach still work (`?robot=1`, `tools/selftest.py`). This also saves a tier snapshot so the tier list can show moves since the last patch.
+6. Only then commits `data.json`. The site picks it up by itself.
+
+If a source changes its layout or a number can't be confirmed, the robot leaves that part alone and opens one issue called **"ZEROED robot needs a look"**. It closes that issue by itself once everything reads fine again.
+
+You can start a run any time from the Actions tab (Update data → Run workflow).
+
+## Security
+
+- No passwords, keys or personal tokens are stored anywhere. Each run uses GitHub's temporary `GITHUB_TOKEN`, which only works on this repo and expires when the run ends.
+- The workflow only runs on its schedule or when someone with write access starts it. It never runs code from pull requests or from other people.
+- The robot uses the Python standard library only (nothing installed), fetches only `https` pages from a fixed list of hosts, caps download size, and never runs anything it downloads.
+- All text is stripped of HTML before it is saved, links must point to known sites, and `validate_data.py` rejects anything that looks like code.
+- It can only change `data.json`; the page itself (`index.html`) is never touched by the robot.
+- Turn on two-factor authentication for your GitHub account (Settings → Password and authentication). That protects the repo more than anything else.

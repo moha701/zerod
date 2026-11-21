@@ -1,16 +1,20 @@
 name: Update data
 
-# Runs on GitHub's servers twice a day (11:41 and 23:41 Oman time), with no Claude involved.
+# The ZEROED data robot. Runs on GitHub's own servers every 3 hours, with no Claude involved.
+# It reads the official MW4 patch notes and public stat sites, checks every number, tests the site
+# with the new data, and only then saves data.json. If anything looks wrong it changes nothing and
+# leaves a note in Issues.
 on:
   schedule:
-    - cron: "41 7,19 * * *"
+    - cron: "41 */3 * * *"
   workflow_dispatch:
     inputs:
       probe:
-        description: "Only save copies of the source pages to the probe-cache branch"
+        description: "Debug only: save copies of the source pages to the probe-cache branch"
         type: boolean
         default: false
 
+# The run gets a temporary token that only works on this repo and expires when the run ends.
 permissions:
   contents: write
   issues: write
@@ -25,10 +29,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Probe sources
+
+      - name: Test the robot
+        run: python3 -m unittest discover -s tools/tests -v
+
+      - name: Probe sources (debug)
         if: ${{ inputs.probe }}
         run: |
-          python3 tools/probe_sources.py
+          python3 -I tools/probe_sources.py
           git config user.name "zeroed-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan probe-cache
@@ -36,3 +44,40 @@ jobs:
           git add probe
           git commit -qm "probe snapshot"
           git push -f origin probe-cache
+
+      - name: Read sources and update data.json
+        id: robot
+        if: ${{ !inputs.probe }}
+        run: |
+          cp data.json /tmp/old.json
+          python3 -I tools/robot.py data.json
+          if git diff --quiet data.json; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Check the new data
+        if: ${{ steps.robot.outputs.changed == 'true' }}
+        run: python3 -I tools/validate_data.py data.json /tmp/old.json
+
+      - name: Test the site with the new data
+        if: ${{ steps.robot.outputs.changed == 'true' }}
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &
+          sleep 2
+          google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=30000 --dump-dom "http://127.0.0.1:8765/index.html?robot=1&notour" > /tmp/dom.html 2>/dev/null || true
+          python3 -I tools/selftest.py /tmp/dom.html data.json
+          python3 -I tools/validate_data.py data.json /tmp/old.json
+
+      - name: Save
+        if: ${{ steps.robot.outputs.changed == 'true' }}
+        run: |
+          git config user.name "zeroed-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git commit -m "Robot data update $(date -u +%Y-%m-%d\ %H:%M) UTC" -m "$(python3 -c 'import json;print(chr(10).join(json.load(open(".robot/report.json"))["changes"][:12]))')"
+          git pull --rebase origin main || { git rebase --abort; echo "Someone else changed data.json; trying again next run"; exit 0; }
+          git push origin HEAD:main
+
+      - name: Leave a note if something went wrong
+        if: ${{ always() && !inputs.probe }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 -I tools/report.py ${{ job.status != 'success' && '"a step failed, see the run log"' || '' }}
