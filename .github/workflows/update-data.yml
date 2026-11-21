@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       probe:
-        description: "Only print what the source pages look like (no changes)"
+        description: "Only save copies of the source pages to the probe-cache branch"
         type: boolean
         default: false
 
@@ -25,9 +25,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
       - name: Probe sources
         if: ${{ inputs.probe }}
-        run: python tools/probe_sources.py
+        run: |
+          python3 tools/probe_sources.py
+          git config user.name "zeroed-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan probe-cache
+          git rm -rfq --cached .
+          git add probe
+          git commit -qm "probe snapshot"
+          git push -f origin probe-cache
