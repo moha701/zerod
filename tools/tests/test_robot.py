@@ -71,6 +71,25 @@ class Parsers(unittest.TestCase):
     def test_apex(self):
         self.assertEqual(len(robot.parse_apex(FX("apex.html"))), 5)
 
+    def test_apex_data_names_the_gun(self):
+        items = ",".join('$R[%d]={name:"%s",slug:"x",label:null,slot:"Apex",slotSlug:"apex",icon:null,unlockLevel:%d,unlockWeapon:"%s"}' % (i, n, l, g)
+                         for i, (n, l, g) in enumerate([("Storm Breaker", 40, "Cronen Squall"), ("Sang Breach", 38, "SANG 9mm"), ("Sang Breach", 38, "SANG 9mm"), ("Quiet Wolf", 30, "Oden")]))
+        ax = robot.parse_apex("<script>" + items + "</script>")
+        self.assertEqual([a["name"] for a in ax], ["Storm Breaker", "Sang Breach", "Quiet Wolf"])  # duplicates dropped
+        d = copy.deepcopy(DATA); r = robot.Robot(d); r.apply_apex(ax)
+        owner = {a["name"]: w["name"] for w in d["weapons"] for a in w.get("apexes", [])}
+        self.assertEqual(owner.get("Storm Breaker"), "Cronen Squall")  # the name alone would be a guess; the data says which gun
+        self.assertEqual(owner.get("Quiet Wolf"), "Oden")
+        self.assertFalse(any("unclear" in p for p in r.problems))
+
+    def test_real_apex_page(self):
+        snap = os.path.join(HERE, "fixtures", "apex_real.html")
+        if not os.path.exists(snap):
+            self.skipTest("no saved copy of the real page")
+        ax = robot.parse_apex(open(snap, encoding="utf-8").read())
+        self.assertGreaterEqual(len(ax), 20)
+        self.assertTrue(all(a.get("weapon") for a in ax))
+
 
 class EndToEnd(unittest.TestCase):
     def run_robot(self, last="2026-11-19"):
@@ -109,6 +128,18 @@ class EndToEnd(unittest.TestCase):
         self.assertNotIn("Mojave .357 Lawless", ax)  # same as the known Mojave Lawless
         self.assertNotIn("Signal 50 Inferno", ax)
         self.assertTrue(any("Cronen Storm" in p for p in r.problems))  # two Cronen guns: not guessed
+
+    def test_missing_gun_is_reported_not_removed(self):
+        d = copy.deepcopy(DATA)
+        d["weapons"].append({"id": "ghost-9", "name": "Ghost 9", "cls": "SMG", "segs": [[0, 4]], "rpm": 800})
+        r = robot.Robot(d)
+        wl = robot.parse_wzstats(FX("wzstats.html"))
+        r.apply_weapon_list(wl, [])
+        self.assertIn("ghost-9", [w["id"] for w in d["weapons"]])
+        if len(wl) >= 15:
+            self.assertIn("Ghost 9", d["robotChecks"]["notInSource"])
+            self.assertTrue(any("Ghost 9" in n for n in r.notes))
+        self.assertFalse(any("Ghost 9" in p for p in r.problems))
 
     def test_shop_and_log(self):
         d, r = self.run_robot()

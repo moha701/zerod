@@ -262,8 +262,20 @@ def parse_shop(h: str) -> list[dict]:
         raise ValueError(f"shop: unexpected bundle count {len(out)}")
     return out
 
+APEX_JSON = re.compile(r'name:"([^"]{3,40})",slug:"[^"]*",label:[^,]*,slot:"Apex",slotSlug:"apex",icon:[^,]*,unlockLevel:(\d+),unlockWeapon:"([^"]{2,40})"')
+
+
 def parse_apex(h: str) -> list[dict]:
-    """'<name>' / 'Unlock level' / '<n>' triples from the Apex list page."""
+    """Apex list. Prefer the page's data (it names the gun each Apex unlocks on);
+    fall back to '<name>' / 'Unlock level' / '<n>' triples from the visible text."""
+    raw = h.replace('\\"', '"')
+    js = [{"name": clean(n, 40), "level": int(l), "weapon": clean(g, 40)} for n, l, g in APEX_JSON.findall(raw)]
+    if len(js) >= 3:
+        seen, out = set(), []
+        for a in js:
+            if norm(a["name"]) not in seen:
+                seen.add(norm(a["name"])); out.append(a)
+        return out
     body = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", h, flags=re.S | re.I)
     lines = [clean(x, 60) for x in re.split(r"<[^>]+>", body)]
     lines = [x for x in lines if x]
@@ -358,6 +370,7 @@ class Robot:
         self.d = data
         self.changes: list[str] = []
         self.problems: list[str] = []
+        self.notes: list[str] = []  # worth knowing, but not a reason to open an issue
         self.sources: dict[str, str] = {}
         self.by_norm = {}
         self._index()
@@ -511,6 +524,18 @@ class Robot:
             self.changes.append(f"New gun added: {name} ({g['cls']})")
             added += 1
             self._index(); known = set(self.by_norm)
+        src = {g["norm"] for g in wl}
+        gone = sorted(w["name"] for w in self.d["weapons"] if not w.get("parent") and not w.get("hidden")
+                      and not any(norm(w["name"]) == s2 or (len(s2) >= 4 and (norm(w["name"]).startswith(s2) or s2.startswith(norm(w["name"])))) for s2 in src))
+        if len(wl) >= 15:
+            checks = self.d.setdefault("robotChecks", {})
+            if gone:
+                checks["notInSource"] = gone[:12]
+                self.notes.append("Guns on ZEROED that the MW4 weapon list doesn't show: " + ", ".join(gone[:12]))
+            else:
+                checks.pop("notInSource", None)
+            if not checks:
+                self.d.pop("robotChecks", None)
 
     # ---- Warzone kill times
     def apply_wz(self, cm):
@@ -563,10 +588,15 @@ class Robot:
             n = norm(ax["name"])
             if n in have or (core(ax["name"]) and core(ax["name"]) in cores):
                 continue
-            first = norm(ax["name"].split()[0])
-            guns = [w for w in self.d["weapons"] if not w.get("parent") and norm(w["name"]).startswith(first) and len(first) >= 2]
-            full = [w for w in guns if n.startswith(norm(w["name"]))]
-            gun = full[0] if len(full) == 1 else guns[0] if len(guns) == 1 else None
+            gun = None
+            if ax.get("weapon"):  # the page says which gun it unlocks on
+                g = self.weapon(ax["weapon"])
+                gun = g if g and not g.get("parent") else None
+            if not gun:
+                first = norm(ax["name"].split()[0])
+                guns = [w for w in self.d["weapons"] if not w.get("parent") and norm(w["name"]).startswith(first) and len(first) >= 2]
+                full = [w for w in guns if n.startswith(norm(w["name"]))]
+                gun = full[0] if len(full) == 1 else guns[0] if len(guns) == 1 else None
             if not gun:
                 self.problems.append(f"New Apex spotted but its gun is unclear: {ax['name']}")
                 continue
@@ -637,15 +667,17 @@ def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "data.json"
     before = open(path, encoding="utf-8").read()
     data = json.loads(before)
+    checks0 = json.dumps(data.get("robotChecks"), sort_keys=True)
     r = Robot(data).run()
     out = r.finish()
-    if r.changes:
+    if r.changes or json.dumps(out.get("robotChecks"), sort_keys=True) != checks0:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     os.makedirs(".robot", exist_ok=True)
     with open(".robot/report.json", "w") as f:
-        json.dump({"changes": r.changes, "problems": r.problems, "sources": r.sources}, f, indent=1)
+        json.dump({"changes": r.changes, "problems": r.problems, "notes": r.notes, "sources": r.sources}, f, indent=1)
     print("CHANGES:", *r.changes, sep="\n  ")
+    print("NOTES:", *r.notes, sep="\n  ")
     print("PROBLEMS:", *r.problems, sep="\n  ")
     print("SOURCES:", r.sources)
 
