@@ -22,3 +22,7 @@ Open the site on your phone, then use **Install app** in the More menu (Android/
 Best gun finder for Multiplayer and Warzone (map, mode, playstyle, aim, fight distance, enemy skill, level, Hardcore) with win rates, 1v2 odds, smart builds, Warzone two-gun loadouts and what-if checks · Squad builder · Aim test · Match log · Weapon levels · Events with countdowns · Search (Ctrl+K) · Arabic · Kill race animation · Gunsmith with detailed 3D models · Create a class with share codes · Compare · Shots-to-kill sheet · Maps & modes · Patch notes · Shop · Camo tracker · Unlock planner · Class roulette · AI coach (calculator mode on GitHub) · How it works.
 
 Camo progress and saved classes are stored in your browser on GitHub Pages.
+
+## Creator
+
+ZEROED is made by **@mhmd8p2**. Follow on Instagram: https://instagram.com/mhmd8p2
