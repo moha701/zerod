@@ -8,6 +8,9 @@ SRC = {
     "wzs_mp.html": "https://wzstats.gg/mw4/multiplayer/stats",
     "shop.html": "https://itemshop.gg/call-of-duty",
     "apex.html": "https://warzoneloadout.games/mw4/attachments/apex",
+    "cm_mp.html": "https://codmunity.gg/ttk/mw4",
+    "cm_stats.html": "https://codmunity.gg/weapon-stats/mw4",
+    "cm_gun.html": "https://codmunity.gg/weapon/mw4/hyeon-burst",
 }
 os.makedirs("probe", exist_ok=True)
 for f, u in SRC.items():
