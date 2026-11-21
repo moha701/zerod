@@ -3733,6 +3733,8 @@ function applyLive(part, v) {
   if (part === "weapons") { D.weapons = mergeList(D.weapons, v.list); reindex(); }
   if (part === "attachments") D.attachments = mergeList(D.attachments, v.list);
   if (part === "maps") D.maps = mergeList(D.maps, v.list);
+  if (part === "wzMaps") D.wzMaps = mergeList(D.wzMaps || [], v.list);
+  if (part === "events" && Array.isArray(v.list)) D.events = v.list;
   if (part === "patches" && Array.isArray(v.list)) { const byDate = {}; D.patches.concat(v.list).forEach((p) => { byDate[p.date + p.title] = p; }); D.patches = Object.values(byDate); }
   if (part === "shop" && v.bundles && (!D.shop || (v.date || "") >= (D.shop.date || ""))) D.shop = v;
   if (part !== "shop" && part !== "meta") reindex();
@@ -3766,7 +3768,7 @@ async function initLive() {
   const user = await claudeUse("user");
   if (!db) { if (!liveOn) setLive(false); return; }
   Personal.init(db, user);
-  const parts = ["meta", "weapons", "attachments", "patches", "shop", "maps"];
+  const parts = ["meta", "weapons", "attachments", "patches", "shop", "maps", "wzMaps", "events"];
   let timeout = setTimeout(() => setLive(false), 10000);
   parts.forEach((p) => {
     try {
