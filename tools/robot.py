@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 
 ALLOWED_HOSTS = {"www.callofduty.com", "codmunity.gg", "wzstats.gg", "itemshop.gg", "warzoneloadout.games"}
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36 zeroed-robot"
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
 MAX_BYTES = 6_000_000
 CLASSES = {"AR", "SMG", "LMG", "Marksman", "Sniper", "Shotgun", "Pistol"}
 CLASS_MAP = {"ASSAULT_RIFLE": "AR", "SMG": "SMG", "SUBMACHINE_GUN": "SMG", "LMG": "LMG", "MARKSMAN_RIFLE": "Marksman", "MARKSMAN": "Marksman", "SNIPER_RIFLE": "Sniper", "SNIPER": "Sniper", "SHOTGUN": "Shotgun", "PISTOL": "Pistol", "HANDGUN": "Pistol",
@@ -59,7 +59,7 @@ def fetch(url: str, retries: int = 2) -> str:
     for i in range(retries + 1):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=45) as r:
                 final = urllib.parse.urlparse(r.geturl())
                 if final.hostname not in ALLOWED_HOSTS:
                     raise ValueError("redirected off allowed hosts")
@@ -590,7 +590,7 @@ class Robot:
         def get_patches():
             urls = [SOURCES["patch_s1"]]
             try:
-                urls = sorted(set(urls + find_patch_pages(fetcher(SOURCES["patch_index"]))), reverse=True)[:4]
+                urls = sorted(set(urls + find_patch_pages(fetcher(SOURCES["patch_index"]))), reverse=True)[:2]
             except Exception as e:
                 self.problems.append(f"patch index: {str(e)[:120]}")
             secs = []

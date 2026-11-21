@@ -76,6 +76,10 @@ jobs:
           git pull --rebase origin main || { git rebase --abort; echo "Someone else changed data.json; trying again next run"; exit 0; }
           git push origin HEAD:main
 
+      - name: Tidy up the old debug branch
+        if: ${{ !inputs.probe }}
+        run: git push origin --delete probe-cache 2>/dev/null || true
+
       - name: Leave a note if something went wrong
         if: ${{ always() && !inputs.probe }}
         env:
